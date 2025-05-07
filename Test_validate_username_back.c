@@ -28,5 +28,5 @@ void test_validate_my_username()
 	printf("Nope");
     }
     
-    TEST_ASSERT_EQUAL_STRING(username_hard, username);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(username_hard, username,sizeof(username);
 }
