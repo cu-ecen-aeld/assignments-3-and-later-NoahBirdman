@@ -29,7 +29,7 @@ int main (int argc, char** argv)
 	filename = argv[1];
 	text = argv[2];
 
-	FILE *file = fopen (filename, "r+");
+	FILE *file = fopen (filename, "w+");
 
 	if(file == NULL) //No file found
 	{
