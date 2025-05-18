@@ -1,4 +1,12 @@
 #include "systemcalls.h"
+#include "syslog.h"
+#include "stdio.h"
+#include <stdbool.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +24,13 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+	if (cmd == NULL)  return false; //return if missing arguments
 
-    return true;
+	int status = system(cmd);
+	if (status == -1) return false; // return if system did not complete
+
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+     
 }
 
 /**
@@ -58,10 +71,30 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+	pid_t pid;
+	int status;
+	pid = fork();
 
+	//Check if process created successfully
+	if(pid == -1)
+	{
+		printf("Failed to create fork");
+		va_end(args);
+		return false;
+	}
+	else if (pid == 0) //PID = child process. Execute the command and then exit
+	{	
+		execv(command[0], command); //Replace the new child process with this new command
+		perror("Execv failed in child process");
+		exit(EXIT_FAILURE); //Exit back and let parent continue
+	}
+	
+	//Parent process - wait here for child to terminate
+	if(waitpid(pid, &status, 0) == -1)	printf("Failed to wait");
     va_end(args);
-
-    return true;
+	
+	//return true if exited normal (WIFEXITED) and exit status is 0 (WEXITSTATUS)
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 /**
@@ -83,7 +116,38 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
     command[count] = command[count];
+	fflush(stdout);
+	pid_t pid = fork();
+	if(pid == -1)
+	{
+		va_end(args);
+		return false;
+	}else if(pid == 0) //child process
+	{
+		int fd = open(outputfile, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+		if(fd < 0)
+		{
+			perror("Error opening file");
+			exit(EXIT_FAILURE);
+		}
 
+		if(dup2(fd, STDOUT_FILENO) < 0)
+		{
+			perror("DUP2 Error");
+			close(fd);
+			exit(EXIT_FAILURE);
+		}
+
+		close(fd);
+
+		execv(command[0], command); //Replace the new child process with this new command
+		perror("Execv failed in child process");
+		exit(EXIT_FAILURE); //Exit back and let parent continue
+	}
+		
+	//Parent process - wait here for child to terminate
+	int status;
+	if(waitpid(pid, &status, 0) == -1)	printf("Failed to wait");
 
 /*
  * TODO
@@ -95,5 +159,6 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 
     va_end(args);
 
-    return true;
+	//return true if exited normal (WIFEXITED) and exit status is 0 (WEXITSTATUS)
+	return WIFEXITED(status) && WEXITSTATUS(status)==0;
 }
